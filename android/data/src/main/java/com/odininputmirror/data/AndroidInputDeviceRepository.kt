@@ -2,6 +2,7 @@ package com.odininputmirror.data
 
 import android.view.InputDevice
 import com.odininputmirror.domain.model.ControllerDevice
+import com.odininputmirror.domain.model.DirectSource
 import com.odininputmirror.domain.model.MappingKey
 import com.odininputmirror.domain.model.TargetTraits
 import com.odininputmirror.domain.repository.InputDeviceRepository
@@ -109,8 +110,40 @@ internal class AndroidInputDeviceRepository(
                 hideNodePath = entry.path,
                 // The mirror is running, so this is the path the wizard sees the pad through.
                 mappingKey = resolveMappingKey(entry.name, procEntries),
+                // Resolved the same way as when it was visible, so a hidden twin does not change
+                // which device a restart would read.
+                directSource = resolveDirectSource(entry, procEntries),
             ),
         )
+    }
+
+    /**
+     * The real pad behind [twin], when the twin cannot carry all of its controls.
+     *
+     * The firmware's twin has one fixed axis set. A pad whose sticks or triggers fall outside it — an
+     * Xbox-protocol pad puts its right stick on RX/RY, which the twin lacks — loses them on the way
+     * through, and no mapping can bring back what never arrives. Its real input device still reports
+     * them, so the mirror reads that instead.
+     *
+     * Null for any pad the twin reproduces fully, so pads that already work keep the path they work
+     * on; and null when [twin] is not a twin, or its real device cannot be found.
+     */
+    internal fun resolveDirectSource(twin: ProcInputEntry, entries: List<ProcInputEntry>): DirectSource? {
+        if (twin.vendorId !in MIRRORING_QUIRK_VENDOR_IDS) {
+            return null
+        }
+        val real = entries.firstOrNull { entry ->
+            entry.vendorId !in MIRRORING_QUIRK_VENDOR_IDS &&
+                entry.vendorId != 0 &&
+                entry.name.equals(twin.name, ignoreCase = true)
+        } ?: return null
+        // Only controls a game reads. Something like ABS_MISC on the real pad dropping out of the twin
+        // costs nothing, and is no reason to leave the path every other pad takes.
+        val lost = (real.absBits - twin.absBits).filter { it in CONTROLLER_ABS_CODES }
+        if (lost.isEmpty()) {
+            return null
+        }
+        return DirectSource(path = real.path, vendorId = real.vendorId, productId = real.productId)
     }
 
     // Decides which controller is the internal one:
@@ -226,6 +259,7 @@ internal class AndroidInputDeviceRepository(
                     // Only an external controller gets one: the internal pad IS the quirk vendor, so
                     // it has no separate real entry to point at, and it is never the one remapped.
                     mappingKey = if (isInternal) null else resolveMappingKey(entry.name, entries),
+                    directSource = if (isInternal) null else resolveDirectSource(entry, entries),
                 )
             }
     }
@@ -335,3 +369,7 @@ private fun InputDevice.getGuid(): String = guidOf(vendorId, productId)
 internal fun guidOf(vendorId: Int, productId: Int): String = String.format("%016x%016x", productId, vendorId)
 
 private fun Int.hasSource(source: Int): Boolean = this and source == source
+
+// Sticks, triggers, throttles and hats: ABS_X..ABS_BRAKE (0x00-0x0a) and ABS_HAT0X..ABS_HAT3Y
+// (0x10-0x17). The axes whose loss in the twin a player would notice.
+internal val CONTROLLER_ABS_CODES: Set<Int> = (0x00..0x0a).toSet() + (0x10..0x17).toSet()

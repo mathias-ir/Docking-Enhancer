@@ -494,6 +494,27 @@ class MirrorUseCaseTest {
     }
 
     @Test
+    fun autoMirrorReadsTheExternalsDirectSourceButKeepsTheTwinAsItsIdentity() {
+        val direct = com.odininputmirror.domain.model.DirectSource("/dev/input/event10", 0x2dc8, 0x3106)
+        val external = externalController(path = "/dev/input/event11", hideNodePath = "/dev/input/event11")
+            .copy(directSource = direct)
+        val local = localController(path = "/dev/input/event8")
+
+        val decision = ResolveAutoMirrorDecisionUseCase()(
+            dockActive = true,
+            devices = listOf(local, external),
+            settings = MirrorSettings(),
+            mirrorRunning = false,
+        )
+
+        val request = (decision as AutoMirrorDecision.Start).request
+        assertEquals(direct, request.directSource)
+        // Persisted, compared and re-materialised as before: only the daemon's argv changes.
+        assertEquals("/dev/input/event11", request.source)
+        assertEquals(listOf("/dev/input/event11"), request.hideNodes)
+    }
+
+    @Test
     fun autoMirrorHideNodesEmptyWhenExternalHasNoHideNode() {
         val external = externalController(path = "/dev/input/event9", guid = "ext", hideNodePath = null)
         val local = localController(path = "/dev/input/event2", guid = "odin")

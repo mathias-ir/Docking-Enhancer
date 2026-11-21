@@ -90,6 +90,9 @@ class InputMirrorSupervisorService : Service() {
                 val now = System.currentTimeMillis()
                 val settings = graph.settingsRepository.getSettings()
                 val dockActive = graph.dockStateRepository.isDockActive()
+                // Before enumerating, so a USB pad the kernel only now agrees to drive is already in
+                // this tick's list. Does real work once per process; every later call returns at once.
+                graph.bindUnknownUsbPads()
                 // Enumerate controllers only when the result is actually consumed: docked (the
                 // auto-mirror decision below reads the list) or the UI is on-screen (it renders the
                 // list for setup). Undocked with the UI hidden, this is the one privileged PServer

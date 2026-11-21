@@ -1,6 +1,7 @@
 package com.odininputmirror.data
 
 import com.odininputmirror.domain.model.ControllerDevice
+import com.odininputmirror.domain.model.DirectSource
 import com.odininputmirror.domain.model.MappingKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -518,12 +519,89 @@ class AndroidInputDeviceRepositoryTest {
         assertTrue(result.isKnownInternal)
     }
 
+    // -- Direct source (the twin cannot carry the pad's axes) ----------------------
+    // Capability masks as captured on an RP5: the twin's fixed ABS=30627 (X Y Z RZ GAS BRAKE HAT0),
+    // an xpad pad's ABS=3003f (X Y Z RX RY RZ HAT0), and a Switch Pro whose axes all fit the twin.
+
+    private val twinAxes = setOf(0x00, 0x01, 0x02, 0x05, 0x09, 0x0a, 0x10, 0x11)
+
+    @Test
+    fun usbXboxPadIsReadDirectlyBecauseTheTwinDropsItsRightStick() {
+        val entries = listOf(
+            procEntry("Xbox Wireless Controller", BUS_USB, 0x2022, 0x3002, eventName = "event8", absBits = twinAxes),
+            procEntry(
+                "Generic X-Box pad", BUS_USB, 0x2dc8, 0x3106, eventName = "event10",
+                absBits = setOf(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x10, 0x11),
+            ),
+            procEntry("Generic X-Box pad", BUS_USB, 0x2022, 0x3001, eventName = "event11", absBits = twinAxes),
+        )
+        val repository = AndroidInputDeviceRepository(pathExists = { it != "/dev/input/event10" })
+        val candidate = ControllerCandidate("Generic X-Box pad", 0x2022, 0x3001, 2, guidOf(0x2022, 0x3001))
+
+        val result = repository.resolveControllerDevice(candidate, entries, repository.computeMirroredNames(entries))
+
+        assertEquals("/dev/input/event11", result?.path)
+        assertEquals("/dev/input/event11", result?.hideNodePath)
+        assertEquals(DirectSource("/dev/input/event10", 0x2dc8, 0x3106), result?.directSource)
+    }
+
+    @Test
+    fun padTheTwinCarriesFullyKeepsReadingTheTwin() {
+        val switchAxes = setOf(0x00, 0x01, 0x02, 0x05, 0x10, 0x11)
+        val entries = listOf(
+            procEntry("Nintendo Switch Pro Controller", BUS_BLUETOOTH, 0x057e, 0x2009, eventName = "event10", absBits = switchAxes),
+            procEntry("Nintendo Switch Pro Controller", BUS_USB, 0x2022, 0x3001, eventName = "event11", absBits = twinAxes),
+        )
+
+        assertNull(rp5Repository.resolveDirectSource(entries[1], entries))
+    }
+
+    @Test
+    fun nonControllerAxesMissingFromTheTwinAreNoReasonToBypassIt() {
+        // ABS_MISC (0x28) is the kind of axis a real pad may report that no game reads.
+        val entries = listOf(
+            procEntry("Some Pad", BUS_BLUETOOTH, 0x1234, 0x5678, eventName = "event10", absBits = setOf(0x00, 0x01, 0x28)),
+            procEntry("Some Pad", BUS_USB, 0x2022, 0x3001, eventName = "event11", absBits = twinAxes),
+        )
+
+        assertNull(rp5Repository.resolveDirectSource(entries[1], entries))
+    }
+
+    @Test
+    fun aDeviceThatIsNotATwinHasNoDirectSource() {
+        val real = procEntry("Generic X-Box pad", BUS_USB, 0x2dc8, 0x3106, eventName = "event10", absBits = setOf(0x03, 0x04))
+
+        assertNull(rp5Repository.resolveDirectSource(real, listOf(real)))
+    }
+
+    @Test
+    fun hiddenTwinKeepsItsDirectSource() {
+        val entries = listOf(
+            procEntry(
+                "Generic X-Box pad", BUS_USB, 0x2dc8, 0x3106, eventName = "event10",
+                absBits = setOf(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x10, 0x11),
+            ),
+            procEntry("Generic X-Box pad", BUS_USB, 0x2022, 0x3001, eventName = "event11", absBits = twinAxes),
+        )
+        val repository = AndroidInputDeviceRepository(
+            pathExists = { false },
+            hiddenSourcePathProvider = { "/dev/input/event11" },
+            mirrorRunningProvider = { true },
+        )
+
+        val result = repository.hiddenSourceDevice(resolved = emptyList(), procEntries = entries).single()
+
+        assertEquals("/dev/input/event11", result.path)
+        assertEquals(DirectSource("/dev/input/event10", 0x2dc8, 0x3106), result.directSource)
+    }
+
     private fun procEntry(
         name: String,
         bus: Int,
         vendorId: Int,
         productId: Int,
         eventName: String = "event${entrySequence++}",
+        absBits: Set<Int> = emptySet(),
     ) = AndroidInputDeviceRepository.ProcInputEntry(
         name = name,
         handlers = listOf(eventName),
@@ -532,6 +610,7 @@ class AndroidInputDeviceRepositoryTest {
         bus = bus,
         vendorId = vendorId,
         productId = productId,
+        absBits = absBits,
     )
 
     private var entrySequence = 0

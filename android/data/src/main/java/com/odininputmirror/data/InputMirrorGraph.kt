@@ -62,6 +62,16 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
         runCatching { defaultMappingSeeder.seedIfEmpty(key) }
     }
 
+    private val usbPadDriverBinder = UsbPadDriverBinder(shell)
+
+    /**
+     * Lets the kernel drive USB pads it would otherwise leave without a driver (see
+     * [UsbPadDriverBinder]). Privileged and blocking the first time, a no-op after that.
+     */
+    fun bindUnknownUsbPads() {
+        runCatching { usbPadDriverBinder.ensureApplied() }
+    }
+
     val getConnectedDevices = GetConnectedDevicesUseCase(inputDeviceRepository)
     val startMirror = StartMirrorUseCase(processRepository, settingsRepository)
     val stopMirror = StopMirrorUseCase(processRepository, settingsRepository)

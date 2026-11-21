@@ -51,12 +51,18 @@ internal class RootMirrorProcessRepository(
         val hiddenStateArg = " --hidden-state-file ${files.hiddenStateFile.absolutePath.shellQuote()}"
         val pidFileArg = " --pid-file ${files.pidFile.absolutePath.shellQuote()}"
         val heartbeatFileArg = " --heartbeat-file ${files.heartbeatFile.absolutePath.shellQuote()}"
+        // What the daemon actually opens: the real pad when the twin would drop its axes. Used for the
+        // already-running match below too, since that compares the daemon's own argv.
+        val daemonSource = request.directSource?.path ?: request.source
+        val sourceIdArg = request.directSource
+            ?.let { " --source-id %04x:%04x".format(it.vendorId, it.productId) }
+            .orEmpty()
         // Foreground invocation only; launchDaemon backgrounds it appropriately per backend. The
         // binary writes (and chmods) its own pid/heartbeat files via --pid-file/--heartbeat-file,
         // so no `echo $! > pidfile` bookkeeping is needed here.
         //
         val launch =
-            "nice -n -20 ${binary.absolutePath.shellQuote()} ${request.source.shellQuote()} ${request.target.shellQuote()}$homeAsBackArg$comboHoldKillAppArg$virtualMouseArg$hideNodeArgs$hiddenStateArg$configArg$controlFifoArg$captureArg$pidFileArg$heartbeatFileArg"
+            "nice -n -20 ${binary.absolutePath.shellQuote()} ${daemonSource.shellQuote()} ${request.target.shellQuote()}$sourceIdArg$homeAsBackArg$comboHoldKillAppArg$virtualMouseArg$hideNodeArgs$hiddenStateArg$configArg$controlFifoArg$captureArg$pidFileArg$heartbeatFileArg"
 
         // Only skip the launch for a daemon already mirroring THESE nodes.
         //
@@ -72,7 +78,7 @@ internal class RootMirrorProcessRepository(
             // opened. Compared exactly rather than by pattern: a substring match would call a daemon
             // on /dev/input/event1 a match for a request for event10.
             append("set -- \$(tr '\\0' ' ' < /proc/\$p/cmdline 2>/dev/null); ")
-            append("[ \"\$2\" = ${request.source.shellQuote()} ] && ")
+            append("[ \"\$2\" = ${daemonSource.shellQuote()} ] && ")
             append("[ \"\$3\" = ${request.target.shellQuote()} ] && exit 0; ")
             append("kill -TERM \$p 2>/dev/null; ")
             append("done; ")

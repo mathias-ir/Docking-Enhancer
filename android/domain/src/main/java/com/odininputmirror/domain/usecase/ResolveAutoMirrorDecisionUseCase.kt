@@ -45,6 +45,7 @@ class ResolveAutoMirrorDecisionUseCase {
             comboHoldKillApp = settings.comboHoldKillApp,
             virtualMouse = settings.virtualMouse,
             hideNodes = listOfNotNull(external.hideNodePath),
+            directSource = external.directSource,
         )
 
         val sameMirror = settings.sourceGuid == external.guid &&

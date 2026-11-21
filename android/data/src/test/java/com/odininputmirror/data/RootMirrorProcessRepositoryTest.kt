@@ -3,6 +3,7 @@ package com.odininputmirror.data
 import com.odininputmirror.domain.model.Binding
 import com.odininputmirror.domain.model.ControlRef
 import com.odininputmirror.domain.model.ControllerMapping
+import com.odininputmirror.domain.model.DirectSource
 import com.odininputmirror.domain.model.MirrorSettings
 import com.odininputmirror.domain.model.MirrorStartRequest
 import com.odininputmirror.domain.repository.MirrorSettingsRepository
@@ -251,6 +252,44 @@ class RootMirrorProcessRepositoryTest {
         val command = shell.launchedDaemons.single()
         assertTrue(command.contains("--hide-node '/dev/input/event10'"))
         assertTrue(command.contains("--hide-node '/dev/input/event11'"))
+    }
+
+    @Test
+    fun startReadsTheDirectSourceAndVerifiesItsId() {
+        repository.start(
+            MirrorStartRequest(
+                source = "/dev/input/event11",
+                target = "/dev/input/event8",
+                homeAsBack = false,
+                comboHoldKillApp = false,
+                hideNodes = listOf("/dev/input/event11"),
+                directSource = DirectSource("/dev/input/event10", 0x2dc8, 0x3106),
+            )
+        )
+
+        val command = shell.launchedDaemons.single()
+        // The daemon opens the real pad, still hides the twin, and the already-running guard compares
+        // against what the daemon was really given.
+        assertTrue(command.contains("input_mirror' '/dev/input/event10' '/dev/input/event8' --source-id 2dc8:3106"))
+        assertTrue(command.contains("--hide-node '/dev/input/event11'"))
+        assertTrue(command.contains("[ \"\$2\" = '/dev/input/event10' ]"))
+        assertFalse(command.contains("'/dev/input/event11' '/dev/input/event8'"))
+    }
+
+    @Test
+    fun startOmitsSourceIdWithoutADirectSource() {
+        repository.start(
+            MirrorStartRequest(
+                source = "/dev/input/event11",
+                target = "/dev/input/event8",
+                homeAsBack = false,
+                comboHoldKillApp = false,
+            )
+        )
+
+        val command = shell.launchedDaemons.single()
+        assertFalse(command.contains("--source-id"))
+        assertTrue(command.contains("'/dev/input/event11' '/dev/input/event8'"))
     }
 
     @Test

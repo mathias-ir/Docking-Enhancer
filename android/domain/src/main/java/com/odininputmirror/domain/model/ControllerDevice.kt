@@ -22,4 +22,21 @@ data class ControllerDevice(
     // vendor:product, so they all share a guid. Null when no distinct real device was found — an
     // internal controller, or a pad the firmware did not republish.
     val mappingKey: MappingKey? = null,
+    // The real pad to read instead of [path], when the firmware's twin cannot carry all of its axes.
+    // Null whenever the twin is faithful, which keeps every pad that works through it on that path.
+    val directSource: DirectSource? = null,
+)
+
+/**
+ * A real controller the mirror reads directly, bypassing the firmware's twin.
+ *
+ * The twin has one fixed axis set, so a pad that reports axes outside it loses them there: an
+ * Xbox-protocol pad's right stick (RX/RY) has no slot once its triggers have taken Z/RZ. The real
+ * device still has them, but the firmware deleted its node, so the daemon opens it through /sys and
+ * checks [vendorId]:[productId] before trusting what it opened.
+ */
+data class DirectSource(
+    val path: String,
+    val vendorId: Int,
+    val productId: Int,
 )

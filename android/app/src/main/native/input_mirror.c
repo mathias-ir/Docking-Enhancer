@@ -15,6 +15,7 @@
 #include "config.h"
 #include "evdev.h"
 #include "hide_nodes.h"
+#include "source_node.h"
 #include "mapping.h"
 #include "mouse.h"
 
@@ -661,7 +662,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s /dev/input/eventSOURCE /dev/input/eventTARGET [--home-as-back] [--combo-hold-kill-app] [--virtual-mouse] [--hide-node PATH]... [--hidden-state-file PATH] [--config-file PATH] [--control-fifo PATH] [--capture-file PATH] [--pid-file PATH] [--heartbeat-file PATH]\n       %s --heal --hidden-state-file PATH\n", argv[0], argv[0]);
+        fprintf(stderr, "Usage: %s /dev/input/eventSOURCE /dev/input/eventTARGET [--home-as-back] [--combo-hold-kill-app] [--virtual-mouse] [--source-id VVVV:PPPP] [--hide-node PATH]... [--hidden-state-file PATH] [--config-file PATH] [--control-fifo PATH] [--capture-file PATH] [--pid-file PATH] [--heartbeat-file PATH]\n       %s --heal --hidden-state-file PATH\n", argv[0], argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -678,10 +679,28 @@ int main(int argc, char **argv) {
     int virtual_mouse = 0;
     const char *hide_paths[MAX_HIDE_NODES];
     int hide_count = 0;
+    // The source's vendor:product, when the app knows it. Lets a source the firmware has removed from
+    // /dev/input be opened anyway, and refuses one that turns out to be another device.
+    struct source_id source_id = {0, 0};
+    int have_source_id = 0;
 
     for (int index = 3; index < argc; index++) {
         if (strcmp(argv[index], "--home-as-back") == 0) {
             home_as_back = 1;
+            continue;
+        }
+
+        if (strcmp(argv[index], "--source-id") == 0 && index + 1 < argc) {
+            unsigned int vendor = 0;
+            unsigned int product = 0;
+            const char *value = argv[++index];
+            if (sscanf(value, "%4x:%4x", &vendor, &product) != 2) {
+                fprintf(stderr, "Bad --source-id: %s\n", value);
+                return EXIT_FAILURE;
+            }
+            source_id.vendor = (unsigned short)vendor;
+            source_id.product = (unsigned short)product;
+            have_source_id = 1;
             continue;
         }
 
@@ -756,7 +775,7 @@ int main(int argc, char **argv) {
     s.capture.first_axis = -1;
     s.capture.log_path = capture_file_path;
 
-    s.source_fd = open(source_path, O_RDONLY | O_CLOEXEC);
+    s.source_fd = open_source_node(source_path, have_source_id ? &source_id : NULL);
     if (s.source_fd < 0) {
         fprintf(stderr, "Failed to open source %s: %s\n", source_path, strerror(errno));
         return EXIT_FAILURE;

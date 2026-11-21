@@ -14,4 +14,8 @@ data class MirrorStartRequest(
     // The controller's captured mapping, resolved from its real identity by the caller. Empty means
     // "no correction", which is what every controller gets until someone runs the wizard.
     val mapping: ControllerMapping = ControllerMapping(),
+    // The real pad the daemon reads in place of [source] (see [DirectSource]). [source] stays the
+    // twin's path regardless: it is what is persisted, compared and re-materialised, so only the
+    // daemon's argv changes.
+    val directSource: DirectSource? = null,
 )
