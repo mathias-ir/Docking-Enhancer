@@ -263,6 +263,18 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
                 onCheckedChange = { viewModel.toggleVirtualMouse(it) },
             )
 
+            state.handheldScreenShown?.let { shown ->
+                Spacer(Modifier.height(12.dp))
+                SettingRow(
+                    title = "Handheld screen while docked",
+                    description = "Keep the handheld's own screen on while an external display is connected. " +
+                        "Also a Quick Settings tile: edit the tiles and add \"Handheld screen\".",
+                    checked = shown,
+                    enabled = true,
+                    onCheckedChange = { viewModel.toggleHandheldScreenShown(it) },
+                )
+            }
+
             Spacer(Modifier.height(16.dp))
             Text(
                 if (state.loading) "Scanning controllers..."

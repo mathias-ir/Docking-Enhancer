@@ -49,6 +49,8 @@ data class MirrorUiState(
     // telling that owner their device "doesn't have it" would be flatly wrong.
     val serviceUnresponsive: Boolean = false,
     val virtualMouse: Boolean = false,
+    // The firmware's "handheld screen off while docked" option; null where the device has none.
+    val handheldScreenShown: Boolean? = null,
 ) {
     // On a recognised handheld (e.g. Odin) the native layer flags the internal controller by
     // hardware signature and locks it. Otherwise the internal defaults to the first detected
@@ -104,6 +106,7 @@ class MirrorViewModel(private val appContext: Context) : ViewModel() {
             }
 
             startSupervisor()
+            refreshHandheldScreen()
             // Cold start: the supervisor may not have published a snapshot yet, so read once
             // directly to fill the screen immediately. Then observe the shared snapshot the
             // supervisor keeps fresh — the UI no longer runs its own PServer poll loop in
@@ -124,6 +127,33 @@ class MirrorViewModel(private val appContext: Context) : ViewModel() {
     // supervisor tick; steady-state updates arrive through the observed snapshot.
     fun onResume() {
         viewModelScope.launch { refresh() }
+        // The Quick Settings tile and the firmware's own menu change it too.
+        if (!_state.value.unsupported) refreshHandheldScreen()
+    }
+
+    private fun refreshHandheldScreen() {
+        viewModelScope.launch {
+            val shown = withContext(Dispatchers.IO) {
+                runCatching { graph.handheldScreen.isShownWhenDocked() }.getOrNull()
+            }
+            _state.update { it.copy(handheldScreenShown = shown) }
+        }
+    }
+
+    // Applies at once, docked or not: it is the firmware's own setting, written through PServer.
+    fun toggleHandheldScreenShown(nextValue: Boolean) {
+        if (_state.value.handheldScreenShown == null) return
+        _state.update { it.copy(handheldScreenShown = nextValue) }
+        viewModelScope.launch {
+            val delivered = withContext(Dispatchers.IO) {
+                runCatching { graph.handheldScreen.setShownWhenDocked(nextValue) }.getOrDefault(false)
+            }
+            if (!delivered) {
+                _state.update {
+                    it.copy(handheldScreenShown = !nextValue, message = "Could not change the handheld screen setting.")
+                }
+            }
+        }
     }
 
     private suspend fun initialLoad() {

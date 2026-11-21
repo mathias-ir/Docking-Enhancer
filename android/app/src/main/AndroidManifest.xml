@@ -9,6 +9,12 @@
          depend on one vendor's leniency. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Package visibility for the Retroid settings app, whose presence says the "handheld screen
+         off while docked" option exists even before its setting has ever been written. -->
+    <queries>
+        <package android:name="com.rp.settings" />
+    </queries>
+
     <application
         android:name=".MainApplication"
         android:allowBackup="false"
@@ -41,6 +47,20 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Supervises a controller input mirror daemon for docked handheld play; must run whenever the device is docked, with no user interaction." />
+        </service>
+
+        <service
+            android:name=".HandheldScreenTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_handheld_screen"
+            android:label="@string/tile_handheld_screen"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
         </service>
 
         <receiver

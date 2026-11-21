@@ -1,6 +1,7 @@
 package com.odininputmirror.data
 
 import android.content.Context
+import android.provider.Settings
 import com.odininputmirror.domain.repository.DockStateRepository
 import com.odininputmirror.domain.repository.InputDeviceRepository
 import com.odininputmirror.domain.repository.MappingRepository
@@ -82,7 +83,18 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
         runCatching { externalDisplayColorFix.sync(dockActive) }
     }
 
-    val getConnectedDevices = GetConnectedDevicesUseCase(inputDeviceRepository)
+    /** The firmware's "handheld screen off while docked" option (see [HandheldScreenSwitch]). */
+    val handheldScreen = HandheldScreenSwitch(
+        readSetting = { Settings.System.getString(appContext.contentResolver, HandheldScreenSwitch.KEY) },
+        isVendorSettingsInstalled = {
+            runCatching {
+                appContext.packageManager.getPackageInfo(HandheldScreenSwitch.VENDOR_SETTINGS_PACKAGE, 0)
+            }.isSuccess
+        },
+        shell = shell,
+    )
+
+    val getConnectedDevices =GetConnectedDevicesUseCase(inputDeviceRepository)
     val startMirror = StartMirrorUseCase(processRepository, settingsRepository)
     val stopMirror = StopMirrorUseCase(processRepository, settingsRepository)
     val getMirrorStatus = GetMirrorStatusUseCase(processRepository, settingsRepository, dockStateRepository)

@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Docking Enhancer</string>
+    <string name="tile_handheld_screen">Handheld screen</string>
+    <string name="tile_handheld_screen_on">On when docked</string>
+    <string name="tile_handheld_screen_off">Off when docked</string>
+    <string name="tile_handheld_screen_unsupported">Not on this device</string>
 </resources>
