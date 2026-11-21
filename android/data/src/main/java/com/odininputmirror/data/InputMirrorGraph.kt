@@ -72,6 +72,16 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
         runCatching { usbPadDriverBinder.ensureApplied() }
     }
 
+    private val externalDisplayColorFix = ExternalDisplayColorFix(shell)
+
+    /**
+     * Keeps the external display out of the washed-out wide-gamut mode while docked and restores the
+     * framework's own colour setting on undock (see [ExternalDisplayColorFix]). Acts on transitions only.
+     */
+    fun syncExternalDisplayColor(dockActive: Boolean) {
+        runCatching { externalDisplayColorFix.sync(dockActive) }
+    }
+
     val getConnectedDevices = GetConnectedDevicesUseCase(inputDeviceRepository)
     val startMirror = StartMirrorUseCase(processRepository, settingsRepository)
     val stopMirror = StopMirrorUseCase(processRepository, settingsRepository)

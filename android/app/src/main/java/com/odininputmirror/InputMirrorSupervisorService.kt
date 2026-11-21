@@ -93,6 +93,9 @@ class InputMirrorSupervisorService : Service() {
                 // Before enumerating, so a USB pad the kernel only now agrees to drive is already in
                 // this tick's list. Does real work once per process; every later call returns at once.
                 graph.bindUnknownUsbPads()
+                // Independent of auto-mirror: the washed-out picture is the display's problem, not
+                // the mirror's. Privileged only on a dock transition.
+                graph.syncExternalDisplayColor(dockActive)
                 // Enumerate controllers only when the result is actually consumed: docked (the
                 // auto-mirror decision below reads the list) or the UI is on-screen (it renders the
                 // list for setup). Undocked with the UI hidden, this is the one privileged PServer
