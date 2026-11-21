@@ -17,12 +17,26 @@ proof, not inspection.
 
 ## Prerequisites
 
-- The Odin connected over adb, **unlocked and awake**.
+- A supported handheld (Odin, or Retroid Pocket 5) connected over adb, **unlocked and awake**.
 - The app installed (the suite copies and tests *its* daemon binary, not a fresh build, so what runs
-  is what ships).
+  is what ships). On a device **without `su`** it must be the **debug** build — see below.
 - `ANDROID_NDK_HOME`, or an NDK under `%LOCALAPPDATA%\Android\Sdk\ndk` (the build script finds it).
 
 No physical external controller is needed. That is the point of the harness.
+
+### Root, with or without `su`
+
+The suite needs root for scaffolding only (`scripts/e2e-lib.sh`, `priv`/`priv_bg`). With `su` (a
+rooted Odin) it uses it. Without (a stock RP5), it goes through `E2eBridgeReceiver`, a receiver that
+exists **only in debug builds** (`android/data/src/debug/`) and hands commands to the same
+PServerBinder the product uses — so there the daemon runs in the product's own `pservice` SELinux
+context, which is a stricter test than `su`. It requires the sender to hold `DUMP` (the adb shell does,
+no third-party app can) and runs in its own `:e2e` process, where the supervisor does not start.
+A shell cannot reach PServerBinder any other way: `service call` reports it missing, even under
+`run-as`, and this firmware ships no `content` command.
+
+The synthetic pads take the handheld's own vendor (`0x2020` Odin, `0x2022` RP5), detected from
+`/proc/bus/input/devices`.
 
 ## Running it
 
@@ -68,7 +82,8 @@ timing across two processes would mean correlating two clock domains.
 It reports a **control** first — the same round trip with no daemon in between — because the raw
 figure includes uinput, the input core and the harness's own wake-up. The mirror's real contribution
 is the difference. Measured on an Odin 2 Portal, 300 samples: control median 21µs, mirrored median
-59–61µs, so the daemon adds **roughly 0.04ms** (p95 ≈ 0.11ms). Well under a tenth of a percent of one
+59–61µs, so the daemon adds **roughly 0.04ms** (p95 ≈ 0.11ms). On a Retroid Pocket 5 (daemon in the
+`pservice` context, 300 samples): control median 40µs, mirrored median 150µs, so **roughly 0.11ms**. Well under a tenth of a percent of one
 60Hz frame, against the 10–25ms a Bluetooth pad already spends on radio.
 
 Treat that number as device-and-moment specific rather than a constant. An earlier run of this same
@@ -82,8 +97,9 @@ this suite, which only checks that events arrive, never how fast.
 
 ## Design rules
 
-**The product is tested through its no-root path.** `su` appears in the runner only as *scaffolding*
-— copying the binary out of the app's private dir, killing a daemon to stage an orphan, cleaning up.
+**The product is tested through its no-root path.** Root (`su`, or the debug bridge) appears in the
+runner only as *scaffolding* — copying the binary out of the app's private dir, killing a daemon to
+stage an orphan, cleaning up.
 The daemon itself is exercised the same way the app runs it. If a test ever needs root to make a
 product behaviour work, that is a finding, not a fix.
 

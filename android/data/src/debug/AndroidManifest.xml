@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug builds only: root bridge for the on-device e2e suite. See E2eBridgeReceiver.
+         DUMP is held by the adb shell and grantable to no third-party app, so nothing else on the
+         device can reach it. -->
+    <application>
+        <receiver
+            android:name="com.odininputmirror.data.E2eBridgeReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:process=":e2e" />
+    </application>
+</manifest>

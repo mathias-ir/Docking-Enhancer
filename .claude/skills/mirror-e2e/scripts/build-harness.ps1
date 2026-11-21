@@ -12,6 +12,7 @@ $OutDir = Join-Path $SkillRoot "build"
 $Output = Join-Path $OutDir "vgamepad"
 $Runner = Join-Path $SkillRoot "scripts/e2e.sh"
 $Latency = Join-Path $SkillRoot "scripts/latency.sh"
+$Lib = Join-Path $SkillRoot "scripts/e2e-lib.sh"
 
 if (-not $env:ANDROID_NDK_HOME) {
     $Candidate = Get-ChildItem "$env:LOCALAPPDATA\Android\Sdk\ndk" -Directory -ErrorAction SilentlyContinue |
@@ -37,6 +38,7 @@ if ($LASTEXITCODE -ne 0) {
 adb push $Output /data/local/tmp/vgamepad | Out-Null
 adb push $Runner /data/local/tmp/e2e.sh | Out-Null
 adb push $Latency /data/local/tmp/latency.sh | Out-Null
-adb shell chmod 755 /data/local/tmp/vgamepad /data/local/tmp/e2e.sh /data/local/tmp/latency.sh
+adb push $Lib /data/local/tmp/e2e-lib.sh | Out-Null
+adb shell chmod 755 /data/local/tmp/vgamepad /data/local/tmp/e2e.sh /data/local/tmp/latency.sh /data/local/tmp/e2e-lib.sh
 
-Write-Host "Harness ready on device: /data/local/tmp/{vgamepad,e2e.sh,latency.sh}"
+Write-Host "Harness ready on device: /data/local/tmp/{vgamepad,e2e.sh,latency.sh,e2e-lib.sh}"

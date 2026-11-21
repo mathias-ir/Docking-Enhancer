@@ -39,17 +39,20 @@ wait_for_gone() {
 
 mirror_pid() { pidof input_mirror 2>/dev/null; }
 
+# priv / priv_bg / require_priv, and HANDHELD / PAD_VENDOR / SRC_PRODUCT / DST_PRODUCT.
+. /data/local/tmp/e2e-lib.sh
+
 stop_mirror() {
     P=$(mirror_pid)
-    [ -n "$P" ] && su -c "kill -KILL $P" 2>/dev/null
+    [ -n "$P" ] && priv "kill -KILL $P" 2>/dev/null
     i=0
     while [ -n "$(mirror_pid)" ] && [ "$i" -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
 }
 
-# Start the daemon as root, detached. Root is test scaffolding only — the product itself reaches the
-# same binary through PServerBinder with no root at all.
+# Start the daemon as root, detached. The product itself reaches the same binary through
+# PServerBinder with no root at all.
 start_mirror() {
-    su -c "$MIRROR $* > $LOG 2>&1 &"
+    priv_bg "$MIRROR $* > $LOG 2>&1"
     i=0
     while [ -z "$(mirror_pid)" ] && [ "$i" -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
 }
@@ -62,25 +65,29 @@ echo "=== setup ==="
 am force-stop com.odininputmirror 2>/dev/null
 stop_mirror
 
-rm -rf $TMP
+require_priv
+
+priv "rm -rf $TMP"
 mkdir -p $TMP
 
 # Test the binary the app actually ships, not a rebuild that might drift from it.
-if ! su -c "cp /data/data/com.odininputmirror/files/bin/input_mirror $MIRROR && chmod 755 $MIRROR" 2>/dev/null; then
+priv "cp /data/data/com.odininputmirror/files/bin/input_mirror $MIRROR && chmod 755 $MIRROR" >/dev/null 2>&1
+if [ ! -x "$MIRROR" ]; then
     echo "  ABORT: no pude copiar el binario del daemon (esta instalada la app?)"
     exit 1
 fi
-echo "  daemon: $(su -c "$MIRROR" 2>&1 | head -n 1 | cut -c1-40)..."
+echo "  daemon: $(priv "$MIRROR 2>&1" | head -n 1 | cut -c1-40)..."
 
 SRCFIFO=$TMP/src.fifo
 DSTFIFO=$TMP/dst.fifo
 mkfifo $SRCFIFO $DSTFIFO
 
-# Source keeps the Odin quirk vendor (0x2020): hide_node refuses anything else. The target takes the
-# Xbox product id so the daemon's Nintendo face-button swap stays off and forwarding is 1:1.
-$VPAD --name "E2E Source Pad" --vendor 0x2020 --product 0x0111 --path-file $TMP/src.path < $SRCFIFO &
+# The pads carry the handheld's own vendor; e2e-lib.sh explains why and picks it.
+echo "  handheld: $HANDHELD (pads $PAD_VENDOR)"
+
+$VPAD --name "E2E Source Pad" --vendor $PAD_VENDOR --product $SRC_PRODUCT --path-file $TMP/src.path < $SRCFIFO &
 exec 3> $SRCFIFO
-$VPAD --name "E2E Target Pad" --vendor 0x2020 --product 0x0112 --path-file $TMP/dst.path < $DSTFIFO &
+$VPAD --name "E2E Target Pad" --vendor $PAD_VENDOR --product $DST_PRODUCT --path-file $TMP/dst.path < $DSTFIFO &
 exec 4> $DSTFIFO
 
 wait_for_file $TMP/src.path
@@ -143,7 +150,7 @@ else
     expect_exists  "$STATE" "queda registro de lo ocultado"
 
     # SIGTERM is the product's own stop signal; it must take the clean path that restores.
-    su -c "kill -TERM $(mirror_pid)" 2>/dev/null
+    priv "kill -TERM $(mirror_pid)" 2>/dev/null
     stop_mirror
     sleep 0.5
 
@@ -161,13 +168,13 @@ if [ -z "$(mirror_pid)" ]; then
     bad "el daemon arranco para el test de huerfano"
 else
     sleep 0.5
-    su -c "kill -KILL $(mirror_pid)" 2>/dev/null
+    priv "kill -KILL $(mirror_pid)" 2>/dev/null
     sleep 0.5
 
     expect_missing "$SRC" "SIGKILL deja el nodo oculto (sin cleanup)"
     expect_exists  "$STATE" "el registro sobrevive para poder sanar"
 
-    su -c "$MIRROR --heal --hidden-state-file $STATE" 2>/dev/null
+    priv "$MIRROR --heal --hidden-state-file $STATE" 2>/dev/null
     sleep 0.3
 
     expect_exists  "$SRC" "--heal devuelve el nodo huerfano"
@@ -188,7 +195,7 @@ else
 
     # Deleting the heartbeat is how the app signals "you have no owner": uninstalled, data cleared,
     # or a duplicate launch it abandoned.
-    su -c "rm -f $HEART"
+    priv "rm -f $HEART"
     wait_for_gone "/proc/$(mirror_pid)" 80
 
     if [ -z "$(mirror_pid)" ]; then
@@ -210,9 +217,9 @@ echo "=== T5: se niega a ocultar un dispositivo ajeno ==="
 # else by the time the daemon acts on it. Unlinking blindly there would take out an unrelated
 # device; the daemon must check identity (EVIOCGID) and refuse.
 #
-# The decoy is --plain (a non-controller) rather than a foreign-vendor pad, because this handheld
-# never lets a foreign-vendor CONTROLLER keep its node: the firmware republishes it as a 0x2020 twin
-# and deletes the original, so there would be nothing left to test the refusal against.
+# The decoy is --plain (a non-controller) rather than a foreign-vendor pad, because these handhelds
+# never let a foreign-vendor CONTROLLER keep its node: the firmware republishes it as a twin under its
+# own vendor and deletes the original, so there would be nothing left to test the refusal against.
 FOREIGNFIFO=$TMP/foreign.fifo
 mkfifo $FOREIGNFIFO
 $VPAD --plain --name "E2E Decoy Device" --vendor 0x1234 --product 0x5678 --path-file $TMP/foreign.path < $FOREIGNFIFO &
@@ -667,7 +674,7 @@ stop_mirror
 exec 3>&-
 exec 4>&-
 sleep 0.5
-su -c "rm -rf $TMP $MIRROR" 2>/dev/null
+priv "rm -rf $TMP $MIRROR" 2>/dev/null
 echo "  limpio"
 
 echo ""

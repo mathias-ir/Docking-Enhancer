@@ -8,6 +8,11 @@ import android.util.Log
 class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Only the main process supervises. Debug builds add an `:e2e` process for the test bridge,
+        // and a supervisor started from there would fight the suite for the controllers.
+        if (getProcessName() != packageName) {
+            return
+        }
         // Started unconditionally, and the service decides. Asking here whether the device ships
         // PServerBinder meant a BLOCKING binder transact on the main thread at process start — and on
         // hardware that publishes the service without answering it (the Odin 2 Mini) that is a
