@@ -102,6 +102,34 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
         shell = shell,
     )
 
+    /** The built-in screen's refresh rate (see [BuiltInRefreshRate]). */
+    val builtInRefreshRate = BuiltInRefreshRate(
+        panelRates = {
+            appContext.getSystemService(DisplayManager::class.java)
+                .getDisplay(Display.DEFAULT_DISPLAY)
+                ?.supportedModes
+                ?.map { it.refreshRate }
+                .orEmpty()
+        },
+        readPeak = { Settings.System.getString(appContext.contentResolver, BuiltInRefreshRate.PEAK) },
+        shell = shell,
+    )
+
+    private fun builtInDisplay(): Display? =
+        appContext.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
+
+    /** Android's own render resolution, full or 720p (see [RenderResolution]). */
+    val renderResolution = RenderResolution(
+        physicalSize = { builtInDisplay()?.mode?.let { it.physicalWidth to it.physicalHeight } },
+        logicalSize = {
+            builtInDisplay()?.let { display ->
+                android.graphics.Point().also { @Suppress("DEPRECATION") display.getRealSize(it) }
+                    .let { it.x to it.y }
+            }
+        },
+        shell = shell,
+    )
+
     val getConnectedDevices = GetConnectedDevicesUseCase(inputDeviceRepository)
     val startMirror = StartMirrorUseCase(processRepository, settingsRepository)
     val stopMirror = StopMirrorUseCase(processRepository, settingsRepository)

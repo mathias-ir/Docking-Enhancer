@@ -4,4 +4,11 @@
     <string name="tile_handheld_screen_on">On when docked</string>
     <string name="tile_handheld_screen_off">Off when docked</string>
     <string name="tile_handheld_screen_unsupported">Not on this device</string>
+    <string name="tile_refresh_rate">Refresh rate</string>
+    <string name="tile_refresh_rate_value">%1$d Hz</string>
+    <string name="tile_refresh_rate_auto">Automatic</string>
+    <string name="tile_refresh_rate_unsupported">Only one rate</string>
+    <string name="tile_resolution">Resolution</string>
+    <string name="tile_resolution_value">%1$dp</string>
+    <string name="tile_resolution_unsupported">Already 720p</string>
 </resources>
