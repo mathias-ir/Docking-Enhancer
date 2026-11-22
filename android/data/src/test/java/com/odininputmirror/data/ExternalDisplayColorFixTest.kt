@@ -15,48 +15,60 @@ class ExternalDisplayColorFixTest {
         override fun launchDaemon(command: String) = false
     }
 
+    private val unmanaged = ExternalDisplayColorFix.UNMANAGED
+    private val restore = ExternalDisplayColorFix.RESTORE
+
     @Test
-    fun appliesUnmanagedOnceWhileDocked() {
+    fun appliesOnDockConfirmsOnceThenStaysQuiet() {
         val shell = RecordingShell()
         val fix = ExternalDisplayColorFix(shell)
-        repeat(3) { fix.sync(dockActive = true) }
-        assertEquals(listOf(ExternalDisplayColorFix.UNMANAGED), shell.commands)
+        repeat(4) { fix.sync(setOf(4)) }
+        assertEquals(listOf(unmanaged, unmanaged), shell.commands)
     }
 
     @Test
     fun restoresOnUndockAndReappliesOnRedock() {
         val shell = RecordingShell()
         val fix = ExternalDisplayColorFix(shell)
-        fix.sync(dockActive = true)
-        fix.sync(dockActive = false)
-        fix.sync(dockActive = false)
-        fix.sync(dockActive = true)
-        assertEquals(
-            listOf(
-                ExternalDisplayColorFix.UNMANAGED,
-                ExternalDisplayColorFix.RESTORE,
-                ExternalDisplayColorFix.UNMANAGED,
-            ),
-            shell.commands,
-        )
+        fix.sync(setOf(4))
+        fix.sync(setOf(4))
+        fix.sync(emptySet())
+        fix.sync(emptySet())
+        fix.sync(setOf(5))
+        assertEquals(listOf(unmanaged, unmanaged, restore, unmanaged), shell.commands)
+    }
+
+    @Test
+    fun aReplugBetweenTicksStillReapplies() {
+        val shell = RecordingShell()
+        val fix = ExternalDisplayColorFix(shell)
+        fix.sync(setOf(4))
+        fix.sync(setOf(4))
+        // Unplugged and plugged back within one tick: never seen undocked, but the id moved on.
+        fix.sync(setOf(5))
+        fix.sync(setOf(5))
+        fix.sync(setOf(5))
+        assertEquals(listOf(unmanaged, unmanaged, unmanaged, unmanaged), shell.commands)
     }
 
     @Test
     fun firstUndockedTickRestoresInCaseAPreviousProcessDiedDocked() {
         val shell = RecordingShell()
-        ExternalDisplayColorFix(shell).sync(dockActive = false)
-        assertEquals(listOf(ExternalDisplayColorFix.RESTORE), shell.commands)
+        ExternalDisplayColorFix(shell).sync(emptySet())
+        assertEquals(listOf(restore), shell.commands)
     }
 
     @Test
     fun retriesWhileTheCommandIsNotDelivered() {
         val shell = RecordingShell(delivers = false)
         val fix = ExternalDisplayColorFix(shell)
-        fix.sync(dockActive = true)
+        fix.sync(setOf(4))
         shell.delivers = true
-        fix.sync(dockActive = true)
-        fix.sync(dockActive = true)
-        assertEquals(2, shell.commands.size)
+        fix.sync(setOf(4))
+        fix.sync(setOf(4))
+        fix.sync(setOf(4))
+        // Undelivered, applied, confirmed, quiet.
+        assertEquals(3, shell.commands.size)
     }
 
     @Test
@@ -64,7 +76,7 @@ class ExternalDisplayColorFixTest {
         assertEquals(
             "n=\$(getprop persist.sys.sf.native_mode); c=\$(getprop persist.sys.sf.color_mode); " +
                 "service call SurfaceFlinger 1023 i32 \${n:-0} i32 \${c:-0} >/dev/null 2>&1",
-            ExternalDisplayColorFix.RESTORE,
+            restore,
         )
     }
 }

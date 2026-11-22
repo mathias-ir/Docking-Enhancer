@@ -1,7 +1,9 @@
 package com.odininputmirror.data
 
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.provider.Settings
+import android.view.Display
 import com.odininputmirror.domain.repository.DockStateRepository
 import com.odininputmirror.domain.repository.InputDeviceRepository
 import com.odininputmirror.domain.repository.MappingRepository
@@ -77,10 +79,16 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
 
     /**
      * Keeps the external display out of the washed-out wide-gamut mode while docked and restores the
-     * framework's own colour setting on undock (see [ExternalDisplayColorFix]). Acts on transitions only.
+     * framework's own colour setting on undock (see [ExternalDisplayColorFix]). Acts on changes only.
+     * Reads the real displays even in forced dock mode: with no monitor there is nothing to fix.
      */
-    fun syncExternalDisplayColor(dockActive: Boolean) {
-        runCatching { externalDisplayColorFix.sync(dockActive) }
+    fun syncExternalDisplayColor() {
+        runCatching {
+            val externals = appContext.getSystemService(DisplayManager::class.java).displays
+                .filter { it.displayId != Display.DEFAULT_DISPLAY && it.state != Display.STATE_OFF }
+                .mapTo(HashSet()) { it.displayId }
+            externalDisplayColorFix.sync(externals)
+        }
     }
 
     /** The firmware's "handheld screen off while docked" option (see [HandheldScreenSwitch]). */
@@ -94,7 +102,7 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
         shell = shell,
     )
 
-    val getConnectedDevices =GetConnectedDevicesUseCase(inputDeviceRepository)
+    val getConnectedDevices = GetConnectedDevicesUseCase(inputDeviceRepository)
     val startMirror = StartMirrorUseCase(processRepository, settingsRepository)
     val stopMirror = StopMirrorUseCase(processRepository, settingsRepository)
     val getMirrorStatus = GetMirrorStatusUseCase(processRepository, settingsRepository, dockStateRepository)

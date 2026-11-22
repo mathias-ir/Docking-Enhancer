@@ -13,21 +13,35 @@ package com.odininputmirror.data
  * boot. So this asks SurfaceFlinger directly for unmanaged colour (NATIVE, pass-through) while docked,
  * and on undock hands it back exactly what system_server last asked for — the same two values it
  * keeps in those properties — so the built-in screen is never left altered on any device.
+ *
+ * It keys on WHICH external displays are attached, not merely whether one is: Android gives a
+ * reconnected monitor a new display id, and a replug quicker than a supervisor tick would otherwise
+ * look like nothing happened while the reconnect put the managed setting back.
  */
 internal class ExternalDisplayColorFix(private val shell: MirrorShell) {
-    // The dock state the current SurfaceFlinger setting was last applied for; null until first sync,
-    // so a process that died mid-dock still restores on its first undocked tick.
+    // The external displays the current SurfaceFlinger setting was last applied for; null until the
+    // first sync, so a process that died mid-dock still restores on its first undocked tick.
     @Volatile
-    private var appliedForDock: Boolean? = null
+    private var appliedFor: Set<Int>? = null
 
-    /** Applies or restores on dock transitions only. Cheap to call every tick. */
-    fun sync(dockActive: Boolean) {
-        if (appliedForDock == dockActive) {
+    // Re-apply once more on the tick after a new dock: the framework finishes setting a reconnected
+    // display up after it is announced, and may restore the managed setting while doing so.
+    @Volatile
+    private var confirmPending = false
+
+    /** Applies or restores when the attached external displays change. Cheap to call every tick. */
+    fun sync(externalDisplays: Set<Int>) {
+        if (appliedFor == externalDisplays) {
+            if (confirmPending && externalDisplays.isNotEmpty() && shell.exec(UNMANAGED)) {
+                confirmPending = false
+            }
             return
         }
+        val docked = externalDisplays.isNotEmpty()
         // Delivery only (PServer has no exit code): retried next tick only if it certainly did not run.
-        if (shell.exec(if (dockActive) UNMANAGED else RESTORE)) {
-            appliedForDock = dockActive
+        if (shell.exec(if (docked) UNMANAGED else RESTORE)) {
+            appliedFor = externalDisplays
+            confirmPending = docked
         }
     }
 
