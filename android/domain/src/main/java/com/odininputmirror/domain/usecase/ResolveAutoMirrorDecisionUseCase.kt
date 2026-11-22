@@ -16,7 +16,7 @@ class ResolveAutoMirrorDecisionUseCase {
         // said yet (it has only just started) or cannot say (a daemon predating the ack).
         appliedGeneration: Long? = null,
     ): AutoMirrorDecision {
-        if (!dockActive) {
+        if (!dockActive && !settings.mirrorWhenUndocked) {
             return AutoMirrorDecision.StopForDock
         }
 

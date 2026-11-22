@@ -18,6 +18,7 @@ class AndroidMirrorSettingsRepository(context: Context) : MirrorSettingsReposito
             comboHoldKillApp = prefs.getBoolean(KEY_COMBO_HOLD_KILL_APP, false),
             virtualMouse = prefs.getBoolean(KEY_VIRTUAL_MOUSE, false),
             autoMirrorEnabled = prefs.getBoolean(KEY_AUTO_MIRROR_ENABLED, true),
+            mirrorWhenUndocked = prefs.getBoolean(KEY_MIRROR_WHEN_UNDOCKED, false),
             expectedRunning = prefs.getBoolean(KEY_EXPECTED_RUNNING, false),
             startedAt = prefs.getLong(KEY_STARTED_AT, 0L),
             manualInternalGuid = prefs.getString(KEY_MANUAL_INTERNAL_GUID, null),
@@ -81,6 +82,10 @@ class AndroidMirrorSettingsRepository(context: Context) : MirrorSettingsReposito
 
     override fun setAutoMirrorEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO_MIRROR_ENABLED, enabled).apply()
+    }
+
+    override fun setMirrorWhenUndocked(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MIRROR_WHEN_UNDOCKED, enabled).apply()
     }
 
     override fun setManualInternalController(guid: String?) = setOptionalGuid(KEY_MANUAL_INTERNAL_GUID, guid)

@@ -224,6 +224,64 @@ class MirrorUseCaseTest {
     }
 
     @Test
+    fun autoMirrorStartsUndockedWhenMirrorWhenUndockedIsOn() {
+        val local = localController(path = "/dev/input/event2", guid = "odin-internal")
+        val external = externalController(path = "/dev/input/event9", guid = "pad")
+
+        val decision = ResolveAutoMirrorDecisionUseCase()(
+            dockActive = false,
+            devices = listOf(local, external),
+            settings = MirrorSettings(mirrorWhenUndocked = true),
+            mirrorRunning = false,
+        )
+
+        assertEquals(
+            AutoMirrorDecision.Start(
+                mirrorRequest(
+                    source = "/dev/input/event9",
+                    target = "/dev/input/event2",
+                    sourceGuid = "pad",
+                    targetGuid = "odin-internal",
+                )
+            ),
+            decision,
+        )
+    }
+
+    @Test
+    fun autoMirrorKeepsRunningUndockedWhenMirrorWhenUndockedIsOn() {
+        val local = localController(path = "/dev/input/event2", guid = "odin-internal")
+        val external = externalController(path = "/dev/input/event9", guid = "pad")
+
+        val decision = ResolveAutoMirrorDecisionUseCase()(
+            dockActive = false,
+            devices = listOf(local, external),
+            settings = MirrorSettings(
+                mirrorWhenUndocked = true,
+                source = "/dev/input/event9",
+                target = "/dev/input/event2",
+                sourceGuid = "pad",
+                targetGuid = "odin-internal",
+            ),
+            mirrorRunning = true,
+        )
+
+        assertEquals(AutoMirrorDecision.Running, decision)
+    }
+
+    @Test
+    fun autoMirrorWaitsUndockedForAnExternalPadWhenMirrorWhenUndockedIsOn() {
+        val decision = ResolveAutoMirrorDecisionUseCase()(
+            dockActive = false,
+            devices = listOf(localController()),
+            settings = MirrorSettings(mirrorWhenUndocked = true),
+            mirrorRunning = false,
+        )
+
+        assertEquals(AutoMirrorDecision.WaitingForExternalController, decision)
+    }
+
+    @Test
     fun autoMirrorWaitsForInternalController() {
         val decision = ResolveAutoMirrorDecisionUseCase()(
             dockActive = true,
@@ -783,6 +841,10 @@ private class FakeMirrorSettingsRepository(
 
     override fun setAutoMirrorEnabled(enabled: Boolean) {
         state = state.copy(autoMirrorEnabled = enabled)
+    }
+
+    override fun setMirrorWhenUndocked(enabled: Boolean) {
+        state = state.copy(mirrorWhenUndocked = enabled)
     }
 
     override fun setManualInternalController(guid: String?) {

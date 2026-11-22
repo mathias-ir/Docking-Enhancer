@@ -188,7 +188,8 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
             Text("Automatic Dock Mirror", color = Palette.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Controllers are selected automatically while dock mode is active.",
+                if (state.mirrorWhenUndocked) "Controllers are selected automatically, docked or not."
+                else "Controllers are selected automatically while dock mode is active.",
                 color = Palette.textSecondary,
                 fontSize = 14.sp,
             )
@@ -236,6 +237,15 @@ fun MirrorScreen(viewModel: MirrorViewModel) {
             }
 
             Spacer(Modifier.height(20.dp))
+            SettingRow(
+                title = "Mirror when undocked",
+                description = "Keep mirroring the external controller without an external display, " +
+                    "so its fixes also apply in handheld mode. Uses a little more battery while no pad is connected.",
+                checked = state.mirrorWhenUndocked,
+                enabled = !state.busy,
+                onCheckedChange = { viewModel.toggleMirrorWhenUndocked(it) },
+            )
+            Spacer(Modifier.height(12.dp))
             SettingRow(
                 title = "Home as Back",
                 description = "External controller Home button acts as Back",

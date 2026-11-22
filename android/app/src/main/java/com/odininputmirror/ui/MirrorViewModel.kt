@@ -36,6 +36,7 @@ data class MirrorUiState(
     val autoMirrorEnabled: Boolean = true,
     val restartWaiting: Boolean = false,
     val docked: Boolean = false,
+    val mirrorWhenUndocked: Boolean = false,
     val manualInternalGuid: String? = null,
     val manualExternalGuid: String? = null,
     val manualExternalName: String? = null,
@@ -211,6 +212,7 @@ class MirrorViewModel(private val appContext: Context) : ViewModel() {
                 autoMirrorEnabled = status.autoMirrorEnabled,
                 restartWaiting = status.expectedRunning && !status.running,
                 docked = status.docked,
+                mirrorWhenUndocked = status.mirrorWhenUndocked,
                 manualInternalGuid = status.manualInternalGuid,
                 manualExternalGuid = status.manualExternalGuid,
                 manualExternalName = status.manualExternalName,
@@ -310,6 +312,21 @@ class MirrorViewModel(private val appContext: Context) : ViewModel() {
         }
     }
 
+    // Persist only, like the option toggles: the supervisor starts or stops the mirror on its next
+    // tick, which the wake brings forward from the 8s undocked idle wait.
+    fun toggleMirrorWhenUndocked(nextValue: Boolean) {
+        if (_state.value.busy) return
+        _state.update { it.copy(mirrorWhenUndocked = nextValue) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { graph.setMirrorWhenUndocked(nextValue) }
+                MirrorStateStore.wake()
+            } catch (error: Exception) {
+                _state.update { it.copy(mirrorWhenUndocked = !nextValue, message = error.message ?: error.toString()) }
+            }
+        }
+    }
+
     fun selectInternalController(guid: String?) {
         if (_state.value.busy) return
         _state.update { it.copy(busy = true) }
@@ -373,6 +390,7 @@ class MirrorViewModel(private val appContext: Context) : ViewModel() {
     private fun buildStatusMessage(status: MirrorStatus, devices: List<ControllerDevice>): String = when {
         status.running -> "Dock mirror active."
         !status.autoMirrorEnabled -> "Automatic dock mirror is disabled."
+        !status.docked && !status.mirrorWhenUndocked -> "Waiting for dock mode."
         devices.none { it.isInternal } -> "Waiting for the built-in controller."
         devices.selectExternalController(
             devices.firstOrNull { it.isInternal },

@@ -17,6 +17,7 @@ import com.odininputmirror.domain.usecase.SetComboHoldKillAppEnabledUseCase
 import com.odininputmirror.domain.usecase.SetHomeAsBackEnabledUseCase
 import com.odininputmirror.domain.usecase.SetManualExternalControllerUseCase
 import com.odininputmirror.domain.usecase.SetManualInternalControllerUseCase
+import com.odininputmirror.domain.usecase.SetMirrorWhenUndockedUseCase
 import com.odininputmirror.domain.usecase.SetVirtualMouseEnabledUseCase
 import com.odininputmirror.domain.usecase.StartMirrorUseCase
 import com.odininputmirror.domain.usecase.StopMirrorUseCase
@@ -138,6 +139,7 @@ class InputMirrorGraph private constructor(context: Context, forceDockMode: Bool
     val setComboHoldKillAppEnabled = SetComboHoldKillAppEnabledUseCase(settingsRepository)
     val setVirtualMouseEnabled = SetVirtualMouseEnabledUseCase(settingsRepository)
     val setAutoMirrorEnabled = SetAutoMirrorEnabledUseCase(settingsRepository)
+    val setMirrorWhenUndocked = SetMirrorWhenUndockedUseCase(settingsRepository)
     val setManualInternalController = SetManualInternalControllerUseCase(settingsRepository)
     val setManualExternalController = SetManualExternalControllerUseCase(settingsRepository)
     val resolveAutoMirrorDecision = ResolveAutoMirrorDecisionUseCase()

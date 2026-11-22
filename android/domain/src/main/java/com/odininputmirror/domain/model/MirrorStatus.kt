@@ -12,6 +12,7 @@ data class MirrorStatus(
     val virtualMouse: Boolean,
     val autoMirrorEnabled: Boolean,
     val docked: Boolean,
+    val mirrorWhenUndocked: Boolean = false,
     val manualInternalGuid: String?,
     val manualExternalGuid: String? = null,
     val manualExternalName: String? = null,

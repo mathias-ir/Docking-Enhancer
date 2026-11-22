@@ -25,6 +25,7 @@ class GetMirrorStatusUseCase(
             virtualMouse = settings.virtualMouse,
             autoMirrorEnabled = settings.autoMirrorEnabled,
             docked = dockStateRepository.isDockActive(),
+            mirrorWhenUndocked = settings.mirrorWhenUndocked,
             manualInternalGuid = settings.manualInternalGuid,
             manualExternalGuid = settings.manualExternalGuid,
             manualExternalName = settings.manualExternalName,

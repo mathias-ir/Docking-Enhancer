@@ -96,12 +96,14 @@ class InputMirrorSupervisorService : Service() {
                 // Independent of auto-mirror: the washed-out picture is the display's problem, not
                 // the mirror's. Privileged only when the attached monitor changes.
                 graph.syncExternalDisplayColor()
-                // Enumerate controllers only when the result is actually consumed: docked (the
-                // auto-mirror decision below reads the list) or the UI is on-screen (it renders the
-                // list for setup). Undocked with the UI hidden, this is the one privileged PServer
-                // call per tick that nobody reads — skip it so a pocketed handheld isn't spawning a
-                // subprocess every idle tick. The undocked decision uses an empty list regardless.
-                val allDevices = if (dockActive || MirrorStateStore.uiVisible) {
+                // Whether the auto-mirror decision below reads the device list: docked, or undocked
+                // with the user having asked for the mirror there too.
+                val mirrorWanted = dockActive || (settings.autoMirrorEnabled && settings.mirrorWhenUndocked)
+                // Enumerate controllers only when the result is actually consumed: by that decision,
+                // or by the UI while it is on-screen (it renders the list for setup). Otherwise this
+                // is the one privileged PServer call per tick that nobody reads — skip it so a
+                // pocketed handheld isn't spawning a subprocess every idle tick.
+                val allDevices = if (mirrorWanted || MirrorStateStore.uiVisible) {
                     graph.inputDeviceRepository.getConnectedControllers()
                 } else {
                     emptyList()
@@ -124,7 +126,14 @@ class InputMirrorSupervisorService : Service() {
                     MirrorStateStore.awaitNextTick(sleepMs)
                     continue
                 }
-                val devices = if (dockActive) allDevices else emptyList()
+                val devices = if (mirrorWanted) allDevices else emptyList()
+                // Undocked, a missing pad is the normal state rather than a moment in a docking
+                // sequence, so poll for one at the idle pace instead of the eager one.
+                val waitingIntervalMs = if (dockActive) {
+                    SUPERVISOR_WAITING_FOR_DEVICE_INTERVAL_MS
+                } else {
+                    SUPERVISOR_IDLE_INTERVAL_MS
+                }
                 val decision = graph.resolveAutoMirrorDecision(
                     dockActive = dockActive,
                     devices = devices,
@@ -148,17 +157,17 @@ class InputMirrorSupervisorService : Service() {
                     }
                     AutoMirrorDecision.WaitingForInternalController -> {
                         updateSupervisorState(SupervisorState.WaitingForInternalController)
-                        sleepMs = SUPERVISOR_WAITING_FOR_DEVICE_INTERVAL_MS
+                        sleepMs = waitingIntervalMs
                     }
                     AutoMirrorDecision.WaitingForExternalController -> {
                         updateSupervisorState(SupervisorState.WaitingForExternalController)
-                        sleepMs = SUPERVISOR_WAITING_FOR_DEVICE_INTERVAL_MS
+                        sleepMs = waitingIntervalMs
                     }
                     AutoMirrorDecision.StopForSourceChange -> {
                         runCatching { graph.stopMirror() }
                         // Stopped, so the next tick sees no mirror and simply waits for the pick.
                         updateSupervisorState(SupervisorState.WaitingForExternalController)
-                        sleepMs = SUPERVISOR_WAITING_FOR_DEVICE_INTERVAL_MS
+                        sleepMs = waitingIntervalMs
                     }
                     AutoMirrorDecision.WaitingForRestartThrottle -> {
                         if (supervisorState != SupervisorState.MirrorStartFailed) {
@@ -251,6 +260,7 @@ class InputMirrorSupervisorService : Service() {
                 virtualMouse = settings.virtualMouse,
                 autoMirrorEnabled = settings.autoMirrorEnabled,
                 docked = dockActive,
+                mirrorWhenUndocked = settings.mirrorWhenUndocked,
                 manualInternalGuid = settings.manualInternalGuid,
                 manualExternalGuid = settings.manualExternalGuid,
                 manualExternalName = settings.manualExternalName,

@@ -9,6 +9,10 @@ data class MirrorSettings(
     val comboHoldKillApp: Boolean = false,
     val virtualMouse: Boolean = false,
     val autoMirrorEnabled: Boolean = true,
+    // Mirror while undocked too, for an external pad used with the handheld's own screen. Off by
+    // default: undocked is the pocketed state, and waiting for a pad there costs a privileged
+    // enumeration every few seconds.
+    val mirrorWhenUndocked: Boolean = false,
     val expectedRunning: Boolean = false,
     val startedAt: Long = 0L,
     val manualInternalGuid: String? = null,

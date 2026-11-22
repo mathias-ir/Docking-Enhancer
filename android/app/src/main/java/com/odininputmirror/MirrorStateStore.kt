@@ -28,8 +28,8 @@ object MirrorStateStore {
     }
 
     // Whether the UI is currently on-screen. The supervisor skips its one privileged PServer call
-    // per tick (the controller enumeration) when undocked AND the UI is hidden, since nobody reads
-    // the device list then and the undocked auto-mirror decision ignores it — so a pocketed handheld
+    // per tick (the controller enumeration) when undocked AND the UI is hidden AND undocked mirroring
+    // is off, since nobody reads the device list then — so a pocketed handheld
     // stops spawning a pserver subprocess every idle tick.
     @Volatile
     var uiVisible: Boolean = false
@@ -53,11 +53,18 @@ object MirrorStateStore {
         synchronized(tickMonitor) {
             val wasVisible = uiVisible
             uiVisible = visible
-            if (visible && !wasVisible) {
-                pendingWake = true
-                tickMonitor.notifyAll()
-            }
+            if (visible && !wasVisible) wakeLocked()
         }
+    }
+
+    /** Cut the supervisor's current wait short, e.g. after a setting that changes its decision. */
+    fun wake() {
+        synchronized(tickMonitor) { wakeLocked() }
+    }
+
+    private fun wakeLocked() {
+        pendingWake = true
+        tickMonitor.notifyAll()
     }
 
     /** The supervisor sleeps here between ticks so [setUiVisible] can cut the wait short. Spurious

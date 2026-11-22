@@ -14,6 +14,14 @@ class SetComboHoldKillAppEnabledUseCase(
     operator fun invoke(enabled: Boolean) = mirrorSettingsRepository.setComboHoldKillAppEnabled(enabled)
 }
 
+// Not a daemon option: it only changes whether the supervisor keeps a mirror running undocked, so
+// it does not advance the config generation.
+class SetMirrorWhenUndockedUseCase(
+    private val mirrorSettingsRepository: MirrorSettingsRepository,
+) {
+    operator fun invoke(enabled: Boolean) = mirrorSettingsRepository.setMirrorWhenUndocked(enabled)
+}
+
 class SetVirtualMouseEnabledUseCase(
     private val mirrorSettingsRepository: MirrorSettingsRepository,
 ) {

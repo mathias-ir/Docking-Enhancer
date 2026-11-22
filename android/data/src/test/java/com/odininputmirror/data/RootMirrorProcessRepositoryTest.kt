@@ -394,6 +394,10 @@ private class FakeSettingsRepository(
         state = state.copy(autoMirrorEnabled = enabled)
     }
 
+    override fun setMirrorWhenUndocked(enabled: Boolean) {
+        state = state.copy(mirrorWhenUndocked = enabled)
+    }
+
     override fun setManualInternalController(guid: String?) {
         state = state.copy(manualInternalGuid = guid)
     }
